@@ -1,67 +1,68 @@
 # CareerFlow
 
-A personal job application tracker built with React, ASP.NET Core and PostgreSQL.
+CareerFlow is a job application tracking web application built with React, TypeScript, ASP.NET Core, and PostgreSQL.
+
+It brings job applications, interview details, status updates, and follow-up dates into one place, making it easier to keep track of opportunities throughout the hiring process.
 
 ## Features
 
-- Add, edit, filter and search applications.
-- Track status changes and review application history.
-- Record interviews and follow-up dates.
-- Load optional fictional records featuring real company names into an empty database.
-- Keep application data in PostgreSQL between restarts.
-- Check key status rules through xUnit tests.
+Application tracking: Add, edit, search, and filter job applications by company, role, and status.
+
+Application history: Track changes as applications move through different recruitment stages.
+
+Interview records: Save interview rounds, dates, modes, and notes for each application.
+
+Follow-up tracking: Set follow-up dates and identify pending actions.
+
+Dashboard: View application totals, active applications, interview-stage applications, and follow-ups due.
+
+Sample data: Load example applications to explore the system
 
 ## Technology
 
 React, TypeScript, Vite, Tailwind CSS, ASP.NET Core 10, Entity Framework Core 10, PostgreSQL.
 
-## Local setup (Windows)
+## How It Works
 
-### Database
+CareerFlow uses a React frontend connected to an ASP.NET Core Web API. The backend handles application data, validates requests, manages status changes, and stores records in PostgreSQL through Entity Framework Core.
 
-Install PostgreSQL, remember the `postgres` user password, and create a database named `careerflow` using pgAdmin or SQL Shell.
+Application status changes are recorded in a history log, while interview details and follow-up dates remain associated with the relevant application.
 
-Configure the backend connection using an environment variable in the PowerShell window (recommended):
+The dashboard displays information from stored application records rather than hardcoded statistics.
 
-```powershell
-$env:ConnectionStrings__CareerFlow = 'Host=localhost;Port=5432;Database=careerflow;Username=postgres;Password=YOUR_PASSWORD'
-```
+## Running Locally
 
-Replace `YOUR_PASSWORD`. Don't commit passwords into Git.
+Requirements: .NET 10 SDK, Node.js, npm, and PostgreSQL.
 
-### Backend
+Create a PostgreSQL database named careerflow and configure the CareerFlow connection string for your local environment.
 
-```powershell
-cd backend/CareerFlow.Api
+Backend
+
+From backend/CareerFlow.Api:
+
 dotnet restore
 dotnet run
-```
 
-The API listens on `http://localhost:5086`. Check `http://localhost:5086/api/health`.
+The API runs at http://localhost:5086.
 
-Stage 1 creates tables automatically on initial startup (`EnsureCreated`). For production, replace this with EF Core migrations and proper credentials.
+Frontend
 
-### Frontend (second PowerShell window)
+From frontend:
 
-```powershell
-cd frontend
 npm install
 npm run dev
-```
 
-Open `http://localhost:5173`. Vite proxies `/api` requests to the .NET backend.
+Open http://localhost:5173 to access CareerFlow.
 
-### Automated tests
+Backend tests
 
-```powershell
-cd backend/CareerFlow.Tests
+From backend/CareerFlow.Tests:
+
 dotnet test
-```
+## Development Status
 
-## Sample data
+CareerFlow currently supports application management, status history, interview records, follow-up dates, and PostgreSQL persistence.
 
-Use **Load sample applications** on an empty database. These records are fictional examples using company names such as Infosys, Accenture, Cognizant, and TCS. They are not claims of actual job applications or vacancies.
+The application has been tested locally with sample records. Authentication, multi-user accounts, and public hosting are planned improvements.
 
-## Current scope
-
-Stage 1 is a local development app. It does not yet provide accounts or multi-user access. Use only fictional demo records until authentication and hosting are implemented. Database schema initialization is intended for a fresh local database. Further stages will add migrations, stronger validation, and deployment configuration.
+The sample records use real company names for demonstration purposes and do not represent actual job applications.
