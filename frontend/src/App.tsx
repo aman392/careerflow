@@ -1,0 +1,554 @@
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  BriefcaseBusiness,
+  CalendarDays,
+  ChevronRight,
+  Plus,
+  Search,
+  ArrowUpRight,
+  X,
+  ClipboardList,
+} from "lucide-react";
+import { api, statuses, type Application, type ApplicationDetail } from "./api";
+const today = () => new Date().toLocaleDateString("en-CA");
+const blank = {
+  company: "",
+  position: "",
+  location: "",
+  status: "Saved",
+  appliedOn: today(),
+  followUpOn: "",
+  notes: "",
+};
+export default function App() {
+  const [items, setItems] = useState<Application[]>([]);
+  const [selected, setSelected] = useState<ApplicationDetail | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("All");
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<number | null>(null);
+  const [form, setForm] = useState({ ...blank });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [interviewForm, setInterviewForm] = useState({
+    round: "Technical interview",
+    date: today(),
+    mode: "Online",
+    notes: "",
+  });
+  async function reload() {
+    try {
+      setItems(await api.list());
+      setError("");
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    void reload();
+  }, []);
+  async function open(id: number) {
+    try {
+      setSelected(await api.detail(id));
+      setError("");
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+  const active = items.filter(
+    (x) => !["Rejected", "Withdrawn", "Offer"].includes(x.status),
+  ).length;
+  const interviews = items.filter((x) => x.status === "Interview").length;
+  const due = items.filter(
+    (x) =>
+      x.followUpOn &&
+      x.followUpOn <= today() &&
+      !["Rejected", "Withdrawn", "Offer"].includes(x.status),
+  ).length;
+  const visible = useMemo(
+    () =>
+      items.filter(
+        (x) =>
+          (filter === "All" || x.status === filter) &&
+          `${x.company} ${x.position} ${x.location}`
+            .toLowerCase()
+            .includes(query.toLowerCase()),
+      ),
+    [items, filter, query],
+  );
+  function edit(item?: Application) {
+    setEditing(item?.id ?? null);
+    setForm(
+      item
+        ? {
+            company: item.company,
+            position: item.position,
+            location: item.location,
+            status: item.status,
+            appliedOn: item.appliedOn,
+            followUpOn: item.followUpOn ?? "",
+            notes: item.notes,
+          }
+        : { ...blank },
+    );
+    setShowForm(true);
+  }
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    try {
+      const data = { ...form, followUpOn: form.followUpOn || null };
+      if (editing) await api.edit(editing, data);
+      else await api.add(data);
+      setShowForm(false);
+      await reload();
+      if (editing && selected?.id === editing) await open(editing);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  async function changeStatus(status: string) {
+    if (!selected) return;
+    try {
+      await api.status(selected.id, status);
+      await open(selected.id);
+      await reload();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  async function addInterview(e: FormEvent) {
+    e.preventDefault();
+    if (!selected) return;
+    try {
+      await api.interview(selected.id, interviewForm);
+      await open(selected.id);
+      setInterviewForm({
+        round: "Technical interview",
+        date: today(),
+        mode: "Online",
+        notes: "",
+      });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  async function loadDemo() {
+    try {
+      await api.demo();
+      await reload();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  return (
+    <div className="layout">
+      <aside className="sidebar">
+        <div className="brand">
+          <span className="brandmark">CF</span>
+          <span>CareerFlow</span>
+        </div>
+        <nav>
+          <span className="navitem current">
+            <ClipboardList size={18} /> Applications
+          </span>
+          <span className="navitem muted">
+            <CalendarDays size={18} /> Follow-ups
+          </span>
+        </nav>
+        <div className="sidefoot">
+          <span className="smallcaps">WORKSPACE</span>
+          <p>Personal job search</p>
+          <small>Stage 1 · Local database</small>
+        </div>
+      </aside>
+      <main className="main">
+        <header className="topbar">
+          <span>Workspace / Applications</span>
+          <span className="topright">Application tracker</span>
+        </header>
+        <div className="content">
+          <div className="heading">
+            <div>
+              <p className="eyebrow">OVERVIEW</p>
+              <h1>Applications</h1>
+              <p className="subtitle">
+                Keep track of roles, interviews and the next step.
+              </p>
+            </div>
+            <button className="primary" onClick={() => edit()}>
+              <Plus size={17} /> Add application
+            </button>
+          </div>
+          {error && (
+            <div className="error" role="alert">
+              {error}
+              <button aria-label="Dismiss" onClick={() => setError("")}>
+                <X size={15} />
+              </button>
+            </div>
+          )}
+          <section className="stats">
+            <div className="stat">
+              <span>Total applications</span>
+              <strong>{items.length}</strong>
+              <small>All recorded roles</small>
+            </div>
+            <div className="stat">
+              <span>Active applications</span>
+              <strong>{active}</strong>
+              <small>In progress</small>
+            </div>
+            <div className="stat">
+              <span>Interviews</span>
+              <strong>{interviews}</strong>
+              <small>Current interview stage</small>
+            </div>
+            <div className="stat">
+              <span>Follow-ups due</span>
+              <strong>{due}</strong>
+              <small>Today or overdue</small>
+            </div>
+          </section>
+          <section className="panel">
+            <div className="panelheader">
+              <div>
+                <h2>Application list</h2>
+                <p>Review and update your applications.</p>
+              </div>
+              <span className="count">{visible.length} results</span>
+            </div>
+            <div className="toolbar">
+              <label className="search">
+                <Search size={17} />
+                <input
+                  placeholder="Search company or role"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </label>
+              <select
+                aria-label="Filter by status"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              >
+                <option>All</option>
+                {statuses.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            {loading ? (
+              <div className="empty">Loading applications…</div>
+            ) : visible.length === 0 ? (
+              <div className="empty">
+                <BriefcaseBusiness size={28} />
+                <h3>
+                  {items.length
+                    ? "No matching applications"
+                    : "No applications yet"}
+                </h3>
+                <p>
+                  {items.length
+                    ? "Try a different search or filter."
+                    : "Add your first application, or load sample records to explore the app."}
+                </p>
+                {items.length === 0 && (
+                  <button className="secondary" onClick={loadDemo}>
+                    Load sample applications
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="tablewrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Company / role</th>
+                      <th>Location</th>
+                      <th>Applied</th>
+                      <th>Status</th>
+                      <th>Follow-up</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visible.map((a) => (
+                      <tr key={a.id} onClick={() => void open(a.id)}>
+                        <td>
+                          <b>{a.company}</b>
+                          <small>{a.position}</small>
+                        </td>
+                        <td>{a.location || "—"}</td>
+                        <td>{a.appliedOn}</td>
+                        <td>
+                          <span
+                            className={
+                              "pill " +
+                              a.status.toLowerCase().replaceAll(" ", "-")
+                            }
+                          >
+                            {a.status}
+                          </span>
+                        </td>
+                        <td>{a.followUpOn ?? "—"}</td>
+                        <td>
+                          <ChevronRight size={17} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      </main>
+      {showForm && (
+        <div className="overlay">
+          <div className="dialog">
+            <div className="dialoghead">
+              <h2>{editing ? "Edit application" : "New application"}</h2>
+              <button className="iconbutton" onClick={() => setShowForm(false)}>
+                <X />
+              </button>
+            </div>
+            <form onSubmit={(e) => void save(e)}>
+              <div className="fields">
+                <label>
+                  Company
+                  <input
+                    required
+                    maxLength={150}
+                    value={form.company}
+                    onChange={(e) =>
+                      setForm({ ...form, company: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Position
+                  <input
+                    required
+                    maxLength={150}
+                    value={form.position}
+                    onChange={(e) =>
+                      setForm({ ...form, position: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Location
+                  <input
+                    value={form.location}
+                    onChange={(e) =>
+                      setForm({ ...form, location: e.target.value })
+                    }
+                  />
+                </label>
+                {!editing && (
+                  <label>
+                    Status
+                    <select
+                      value={form.status}
+                      onChange={(e) =>
+                        setForm({ ...form, status: e.target.value })
+                      }
+                    >
+                      {statuses.map((s) => (
+                        <option key={s}>{s}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <label>
+                  Application date
+                  <input
+                    type="date"
+                    value={form.appliedOn}
+                    onChange={(e) =>
+                      setForm({ ...form, appliedOn: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Follow-up date
+                  <input
+                    type="date"
+                    value={form.followUpOn}
+                    onChange={(e) =>
+                      setForm({ ...form, followUpOn: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="full">
+                  Notes
+                  <textarea
+                    rows={3}
+                    value={form.notes}
+                    onChange={(e) =>
+                      setForm({ ...form, notes: e.target.value })
+                    }
+                  />
+                </label>
+              </div>
+              <footer>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => setShowForm(false)}
+                >
+                  Cancel
+                </button>
+                <button className="primary">Save application</button>
+              </footer>
+            </form>
+          </div>
+        </div>
+      )}
+      {selected && (
+        <div
+          className="overlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setSelected(null);
+          }}
+        >
+          <div className="dialog detail">
+            <div className="dialoghead">
+              <div>
+                <p className="eyebrow">APPLICATION DETAILS</p>
+                <h2>{selected.company}</h2>
+                <p>{selected.position}</p>
+              </div>
+              <button className="iconbutton" onClick={() => setSelected(null)}>
+                <X />
+              </button>
+            </div>
+            <div className="detailbody">
+              <div className="detailrow">
+                <span>Status</span>
+                <select
+                  value={selected.status}
+                  disabled={["Rejected", "Withdrawn", "Offer"].includes(
+                    selected.status,
+                  )}
+                  onChange={(e) => void changeStatus(e.target.value)}
+                >
+                  {statuses.map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="detailrow">
+                <span>Follow-up</span>
+                <b>{selected.followUpOn ?? "Not set"}</b>
+              </div>
+              <button
+                className="textbutton"
+                onClick={() => {
+                  const a = selected;
+                  setSelected(null);
+                  edit(a);
+                }}
+              >
+                Edit application <ArrowUpRight size={15} />
+              </button>
+              <h3>Status history</h3>
+              <div className="timeline">
+                {selected.history.length ? (
+                  selected.history
+                    .slice()
+                    .reverse()
+                    .map((x) => (
+                      <div key={x.id}>
+                        <b>{x.toStatus}</b>
+                        <small>{new Date(x.changedAt).toLocaleString()}</small>
+                      </div>
+                    ))
+                ) : (
+                  <p>No status history yet.</p>
+                )}
+              </div>
+              <h3>Interviews</h3>
+              {selected.interviews.map((x) => (
+                <div className="interview" key={x.id}>
+                  <b>{x.round}</b>
+                  <span>
+                    {x.date} · {x.mode}
+                  </span>
+                  {x.notes && <small>{x.notes}</small>}
+                </div>
+              ))}
+              <form
+                className="interviewform"
+                onSubmit={(e) => void addInterview(e)}
+              >
+                <div className="fields">
+                  <label>
+                    Round
+                    <input
+                      required
+                      value={interviewForm.round}
+                      onChange={(e) =>
+                        setInterviewForm({
+                          ...interviewForm,
+                          round: e.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Date
+                    <input
+                      type="date"
+                      required
+                      value={interviewForm.date}
+                      onChange={(e) =>
+                        setInterviewForm({
+                          ...interviewForm,
+                          date: e.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Mode
+                    <select
+                      value={interviewForm.mode}
+                      onChange={(e) =>
+                        setInterviewForm({
+                          ...interviewForm,
+                          mode: e.target.value,
+                        })
+                      }
+                    >
+                      <option>Online</option>
+                      <option>On-site</option>
+                      <option>Phone</option>
+                    </select>
+                  </label>
+                  <label>
+                    Notes
+                    <input
+                      value={interviewForm.notes}
+                      onChange={(e) =>
+                        setInterviewForm({
+                          ...interviewForm,
+                          notes: e.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+                <button className="secondary" type="submit">
+                  <Plus size={16} /> Add interview
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
